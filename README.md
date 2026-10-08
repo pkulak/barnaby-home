@@ -1,0 +1,229 @@
+# Barnaby Home
+
+Barnaby Home turns a fresh VPS into a private chat server for a family, with a
+[Barnaby](https://github.com/pkulak/barnaby) agent living in the family room.
+It's one NixOS flake: you fill in a domain, an SSH key, and an OpenRouter key,
+and [nixos-anywhere](https://github.com/nix-community/nixos-anywhere) installs
+the rest.
+
+What you get:
+
+| Address | What's there |
+|---|---|
+| `https://chat.<domain>` | [Element](https://element.io), the chat app, in the browser |
+| `<domain>` | The Matrix server, [tuwunel](https://github.com/matrix-construct/tuwunel), including its sign-up and sign-in pages |
+| `call.<domain>` | Voice and video calls, through [LiveKit](https://livekit.io) |
+
+Everyone who signs up lands in an encrypted Family room with the agent. The room
+is closed to other Matrix servers, and sign-up needs a token, so nobody gets in
+without an invite.
+
+The agent talks to models through [OpenRouter](https://openrouter.ai), and the
+defaults all have zero data retention (ZDR) endpoints: providers that don't store
+or train on your messages.
+
+## Requirements
+
+- **A VPS** with at least 2 GB of RAM (nixos-anywhere needs 1.5 GB just to
+  install) and 20 GB of disk, running any Linux you can SSH into as root or as a
+  user with sudo. The install erases it. So far it's only been tested on an AWS
+  EC2 t3.small.
+- **A domain**, or a subdomain of one you already have.
+- **Nix** on your own computer, with flakes enabled.
+- **An OpenRouter API key.** Turn on "Zero Data Retention" in OpenRouter's privacy
+  settings too; it's the only thing that stops a request from going to a
+  provider that keeps it (see [Privacy](#privacy)).
+
+## Installing
+
+### 1. Point DNS at the VPS
+
+Add two `A` records (and `AAAA`, if the VPS has IPv6), both pointing at the VPS:
+
+```
+family.example.com      A  203.0.113.10
+*.family.example.com    A  203.0.113.10
+```
+
+The wildcard covers `chat.` and `call.`. Let's Encrypt checks these names during
+the install, so set them up first, and give the VPS a static IP (an Elastic IP,
+on AWS) so they stay right.
+
+### 2. Open the ports
+
+NixOS runs its own firewall, but most providers also have one in front of the
+VPS (a security group, on AWS). Open these there:
+
+| Port | Protocol | For |
+|---|---|---|
+| 22 | TCP | SSH |
+| 80, 443 | TCP | The web, Matrix, and certificates |
+| 7881 | TCP | Calls, when UDP is blocked |
+| 50000–51000 | UDP | Calls |
+| 3478 | UDP | Calls through TURN, for people behind strict NAT |
+| 5349 | TCP | Calls through TURN over TLS, for networks that block UDP |
+
+Leave out everything but 22, 80, and 443 if you set `calls.enable = false`.
+
+### 3. Create your config
+
+```bash
+mkdir family && cd family
+nix flake init -t github:pkulak/barnaby-home
+git init && git add .
+```
+
+Then edit `configuration.nix`. At a minimum, set the domain, your SSH public
+key, the time zone, your username in `admins`, and the disk. To find the disk,
+SSH in and run `lsblk`; it's usually `/dev/sda`, `/dev/vda`, or `/dev/nvme0n1`.
+
+### 4. Add your keys
+
+```bash
+cp secrets.env.example secrets.env
+chmod 600 secrets.env
+```
+
+Fill in `OPENROUTER_API_KEY`, plus the keys for any extra skills you turned on.
+Git ignores `secrets.env`, so it never ends up in the repository (or in the Nix
+store).
+
+### 5. Install
+
+nixos-anywhere copies whatever is in `extra/` onto the new system, permissions
+and all, so put `secrets.env` where the server expects it (and make sure `/var`
+stays readable):
+
+```bash
+mkdir -p extra/var/lib/barnaby-home
+chmod 755 extra extra/var extra/var/lib
+chmod 700 extra/var/lib/barnaby-home
+cp secrets.env extra/var/lib/barnaby-home/
+
+nix run github:nix-community/nixos-anywhere -- \
+  --flake .#home \
+  --generate-hardware-config nixos-facter ./facter.json \
+  --extra-files ./extra \
+  --target-host root@203.0.113.10
+
+rm -r extra
+```
+
+Use `--target-host ubuntu@...` (or whatever the provider's user is) if root
+can't log in; nixos-anywhere uses sudo. Add `-i ~/.ssh/key.pem` if the VPS needs
+a particular key.
+
+The VPS reboots into NixOS at the end, and nixos-anywhere
+writes `facter.json`, which describes its hardware. Commit that file; later
+deploys need it.
+
+### 6. Sign up
+
+The first sign-up needs the setup token:
+
+```bash
+ssh root@family.example.com cat /var/lib/barnaby-home/registration-token
+```
+
+Open `https://chat.family.example.com`, choose "Create account", and sign up
+with the username you put in `admins` and that token. Within a minute you're a
+server admin, and an admin room shows up in Element (under "System Alerts").
+You'll also be in the Family room with the agent.
+
+### 7. Invite your family
+
+Make a one-time invite token by sending this in the admin room:
+
+```
+!admin token issue --once --max-age 7d
+```
+
+Send them the token and the `https://chat.<domain>` link. Once they sign up,
+they're in the Family room too.
+
+The setup token keeps working, so keep it to yourself.
+
+## Updating
+
+```bash
+nix flake update
+nix run nixpkgs#nixos-rebuild -- switch --flake .#home --target-host root@family.example.com
+```
+
+The same `nixos-rebuild` command applies any change to `configuration.nix`. It
+builds on your computer, so on a Mac (which can't build Linux systems) add
+`--build-host root@family.example.com` to build on the VPS instead.
+
+To change a key, edit `/var/lib/barnaby-home/secrets.env` on the server, then
+restart the agent:
+
+```bash
+ssh root@family.example.com systemctl restart container@barnaby
+```
+
+If a key that a skill needs is missing, `journalctl -u barnaby-home-setup` says
+so.
+
+## Configuration
+
+Everything is under `barnabyHome` in `configuration.nix`:
+
+| Option | Default | What it does |
+|---|---|---|
+| `domain` | | The Matrix server name, and the base for `chat.` and `call.` |
+| `disk` | | The disk to install onto |
+| `admins` | `[ ]` | Usernames that become server admins when they sign up |
+| `location` | `null` | `"latitude,longitude"`, the weather skill's default location |
+| `secretsFile` | `/var/lib/barnaby-home/secrets.env` | Where the keys are. Point this at an agenix or sops secret if you use those. |
+| `calls.enable` | `true` | Voice and video calls |
+| `agent.name` | `"Barnaby"` | The agent's display name |
+| `agent.username` | `name`, lowercased | Its Matrix username. It's set on first boot, so changing it later does nothing. |
+| `agent.soul` | Barnaby's, with `name` filled in | A file with the agent's personality and instructions |
+| `agent.model` | `anthropic/claude-sonnet-5.5` | The OpenRouter model it chats with |
+| `agent.skills` | See below | Skills to turn on or off |
+
+The agent also uses the system's `time.timeZone`.
+
+## Skills
+
+| Skill | What it does | Needs | Default |
+|---|---|---|---|
+| `image` | Draws and edits images | `OPENROUTER_API_KEY` | On |
+| `transcribe` | Reads voice messages | `OPENROUTER_API_KEY` | On |
+| `sports-scores` | Scores, schedules, and standings | `OPENROUTER_API_KEY` | On |
+| `sports-monitor` | Watches a game and sends one alert | Nothing more | On |
+| `weather` | Forecasts and conditions | `TOMORROWIO_API_KEY` | Off |
+| `web-search` | Searches the web with Kagi | `KAGI_KEY` | Off |
+| `calendar` | Reads and edits a CalDAV calendar | `CALDAV_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` | Off |
+
+Turn one on with `agent.skills.weather = true;`, or off with `false`. Turning
+off `sports-scores` turns off `sports-monitor` too. A path to a
+directory with a `SKILL.md` adds your own; see Barnaby's
+[skills docs](https://github.com/pkulak/barnaby/blob/master/docs/skills.md).
+
+## Privacy
+
+The chat server is yours: messages, accounts, and files stay on the VPS. The
+agent, of course, has to send what it reads to a model. Here's where it goes:
+
+- **Chat:** `agent.model`, through OpenRouter. The default has ZDR endpoints on
+  Amazon Bedrock and Google.
+- **Images and voice messages:** Microsoft's MAI models on Azure, through
+  OpenRouter, both ZDR.
+- **Weather, search, and calendar:** Tomorrow.io, Kagi, and your CalDAV server,
+  but only if you turn them on.
+
+Nothing in Barnaby Home forces OpenRouter to use ZDR endpoints yet. OpenRouter's
+account setting does: with it on, a request to a model without a ZDR endpoint
+fails instead of quietly going somewhere else.
+
+## Limitations
+
+- **No backups yet.** Everything lives in `/var/lib`, and losing the VPS loses it.
+- **The agent reads everything in the Family room**, and every message is a
+  model call, even the ones it decides not to answer. A chatty family will see
+  that on the OpenRouter bill.
+- **The agent created the Family room, so it's the room's admin.** Nothing
+  hands that to a person yet.
+- **Phone apps haven't been tested yet.** Element in the browser works,
+  including calls.
