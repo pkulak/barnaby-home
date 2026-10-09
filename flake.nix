@@ -24,6 +24,7 @@
     }:
     let
       inherit (nixpkgs.lib.modules) importApply;
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
     in
     {
       # The services: Matrix, Element, calls, and the agent.
@@ -37,9 +38,21 @@
         description = "A family's Barnaby Home server";
       };
 
-      checks.x86_64-linux.vm = import ./tests/vm.nix {
-        pkgs = nixpkgs.legacyPackages.x86_64-linux;
-        module = self.nixosModules.default;
+      # What template/barnaby-home runs: setup, configure, install, and deploy.
+      packages.x86_64-linux.cli = pkgs.callPackage ./cli { };
+
+      checks.x86_64-linux = {
+        vm = import ./tests/vm.nix {
+          inherit pkgs;
+          module = self.nixosModules.default;
+        };
+
+        inherit (self.packages.x86_64-linux) cli;
+
+        launcher = pkgs.runCommand "barnaby-home-launcher" { } ''
+          ${pkgs.shellcheck}/bin/shellcheck ${./template/barnaby-home}
+          touch $out
+        '';
       };
     };
 }

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Sets up, configures, installs, and deploys Barnaby Home. It runs everything
+# in Docker, so Docker is all you need:
+#
+#   bash barnaby-home setup family
+#   cd family
+#   ./barnaby-home configure
+#   ./barnaby-home install
+#   ./barnaby-home deploy     # after changing anything
+#   ./barnaby-home update     # to update everything, then deploy
+#
+# It stays compatible with the bash 3.2 that macOS ships.
+set -euo pipefail
+
+image=nixos/nix:2.35.2
+flake=${BARNABY_HOME_FLAKE:-github:pkulak/barnaby-home}
+
+if ! command -v docker > /dev/null; then
+  echo "Barnaby Home needs Docker: https://docs.docker.com/get-docker/" >&2
+  exit 1
+fi
+
+# Setup runs the latest version (--refresh skips Nix's hour-long cache of
+# which commit that is); everything after that runs the one in flake.lock.
+if [ "${1:-}" = setup ]; then
+  tool=(--refresh "$flake#cli")
+elif [ -f flake.lock ]; then
+  tool=(--inputs-from . "barnaby-home#cli")
+else
+  echo "Run this in the directory that setup made, or start with: $0 setup <directory>" >&2
+  exit 1
+fi
+
+# The project at the same path as here, and the home directory read-only, so
+# paths to SSH keys work unchanged.
+mounts=(-v "$PWD:$PWD")
+if [ "$PWD" != "$HOME" ]; then
+  mounts+=(-v "$HOME:$HOME:ro")
+fi
+
+tty=-i
+if [ -t 0 ] && [ -t 1 ]; then
+  tty=-it
+fi
+
+# For configure's default time zone. /etc/localtime links into a zoneinfo
+# directory on Linux and macOS.
+tz=$(readlink /etc/localtime 2> /dev/null | sed -n 's|.*zoneinfo/||p' || true)
+
+# Always x86_64, since that's what the server runs; on Apple Silicon, Docker
+# emulates it. Seccomp filters don't work under emulation, and builds run
+# without Nix's sandbox, so --init reaps the processes they leave behind. The
+# Nix store lives in a volume, so later runs don't download everything again.
+exec docker run --rm --init "$tty" --platform linux/amd64 \
+  "${mounts[@]}" -w "$PWD" \
+  -v barnaby-home-nix:/nix \
+  -e NIX_CONFIG=$'experimental-features = nix-command flakes\nfilter-syscalls = false\nwarn-dirty = false' \
+  -e XDG_CACHE_HOME=/nix/var/cache/barnaby-home \
+  -e HOST_HOME="$HOME" \
+  -e HOST_USER="${USER:-}" \
+  -e HOST_TZ="${tz:-${TZ:-}}" \
+  "$image" nix run "${tool[@]}" -- "$@"

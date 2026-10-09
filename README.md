@@ -2,9 +2,8 @@
 
 Barnaby Home turns a fresh VPS into a private chat server for a family, with a
 [Barnaby](https://github.com/pkulak/barnaby) agent living in the family room.
-It's one NixOS flake: you fill in a domain, an SSH key, and an OpenRouter key,
-and [nixos-anywhere](https://github.com/nix-community/nixos-anywhere) installs
-the rest.
+A script asks you for a domain, an SSH key, and an OpenRouter key, then
+installs the rest. All it needs on your computer is Docker.
 
 What you get:
 
@@ -25,13 +24,16 @@ or train on your messages.
 ## Requirements
 
 - **A VPS** with at least 2 GB of RAM (nixos-anywhere needs 1.5 GB just to
-  install) and 20 GB of disk, running any Linux you can SSH into as root or as a
-  user with sudo. The install erases it. So far it's only been tested on an AWS
-  EC2 t3.small. Everything runs in about 450 MB, so you can probably shrink it
-  to 1 GB after the install, as long as you build updates on your own computer
-  (see [Updating](#updating)).
+  install) and 20 GB of disk, running any x86_64 Linux you can SSH into as root
+  or as a user with sudo. The install erases it. So far it's only been tested on
+  an AWS EC2 t3.small. Everything runs in about 450 MB, and builds happen on
+  your computer, so you can probably shrink it to 1 GB after the install.
 - **A domain**, or a subdomain of one you already have.
-- **Nix** on your own computer, with flakes enabled.
+- **[Docker](https://docs.docker.com/get-docker/)** on your own computer, and
+  10 GB or so of disk for it. On a Mac with Apple Silicon, it runs the x86_64
+  container through Rosetta (Docker Desktop's "Use Rosetta" setting), which
+  is slower.
+- **An SSH key.** If you don't have one, `ssh-keygen -t ed25519` makes one.
 - **An OpenRouter API key.** Turn on "Zero Data Retention" in OpenRouter's privacy
   settings too; it's the only thing that stops a request from going to a
   provider that keeps it (see [Privacy](#privacy)).
@@ -67,77 +69,64 @@ VPS (a security group, on AWS). Open these there:
 
 Leave out everything but 22, 80, and 443 if you set `calls.enable = false`.
 
-### 3. Create your config
+### 3. Set up
 
 ```bash
-mkdir family && cd family
-nix flake init -t github:pkulak/barnaby-home
-git init && git add .
+curl -fsSLO https://raw.githubusercontent.com/pkulak/barnaby-home/main/template/barnaby-home
+bash barnaby-home setup family
+cd family
 ```
 
-Then edit `configuration.nix`. At a minimum, set the domain, your SSH public
-key, the time zone, your username in `admins`, and the disk. To find the disk,
-SSH in and run `lsblk -dp`; it's usually `/dev/sda`, `/dev/vda`, or
-`/dev/nvme0n1`.
+That makes a `family` directory with a git repository, the config, and a copy
+of the script. Everything after this runs from there. The first run takes a few
+minutes, while Docker downloads Nix and Nix downloads everything else.
+
+### 4. Configure
+
+```bash
+./barnaby-home configure
+```
+
+It asks for the domain, the SSH key to log in with (`~/.ssh/id_ed25519`, by
+default), how you SSH into the VPS now (`ssh -i ~/keys/aws.pem
+ubuntu@203.0.113.10`, say), your username in the chat, the time zone, the
+agent's name, any extra skills, and the OpenRouter key. It logs in to the VPS to find the disk to install onto.
+
+The answers go into `configuration.nix` and `secrets.env` (which git ignores,
+so the keys never end up in the repository or the Nix store), and you can edit
+both by hand from here on; see [Configuration](#configuration). You can run
+configure again, too, but it starts `configuration.nix` over, so it asks first
+if you've changed anything.
 
 The agent works fine without knowing anything about your family, but it's much
 better when it does. Edit `soul.md` (who's who, where you live, which teams you
-follow) and uncomment `soul = ./soul.md;`. You can do this later, too; it takes
-effect on the next deploy.
-
-### 4. Add your keys
-
-```bash
-cp secrets.env.example secrets.env
-chmod 600 secrets.env
-nano secrets.env
-```
-
-Fill in `OPENROUTER_API_KEY`, plus the keys for any extra skills you turned on.
-Git ignores `secrets.env`, so it never ends up in the repository (or in the Nix
-store).
+follow) and uncomment `soul = ./soul.md;` in `configuration.nix`. You can do
+this later, too; it takes effect on the next deploy.
 
 ### 5. Install
 
-nixos-anywhere copies whatever is in `extra/` onto the new system, permissions
-and all, so put `secrets.env` where the server expects it (and make sure `/var`
-stays readable):
-
 ```bash
-mkdir -p extra/var/lib/barnaby-home
-chmod 755 extra extra/var extra/var/lib
-chmod 700 extra/var/lib/barnaby-home
-cp secrets.env extra/var/lib/barnaby-home/
-
-nix run github:nix-community/nixos-anywhere -- \
-  --flake .#home \
-  --generate-hardware-config nixos-facter ./facter.json \
-  --extra-files ./extra \
-  --target-host root@203.0.113.10
-
-rm -r extra
+./barnaby-home install
 ```
 
-Use `--target-host ubuntu@...` (or whatever the provider's user is) if root
-can't log in; nixos-anywhere uses sudo. Add `-i ~/.ssh/key.pem` if the VPS needs
-a particular key.
-
-The VPS reboots into NixOS at the end, and nixos-anywhere
-writes `facter.json`, which describes its hardware. Commit that file; later
-deploys need it.
+This erases the VPS, so it has you type the domain first. Then it runs
+nixos-anywhere, which builds the system on your computer, copies it over, and
+reboots the VPS into NixOS. It writes two files you should commit:
+`facter.json`, which describes the VPS's hardware, and `known_hosts`, its new
+SSH host key.
 
 ### 6. Sign up
 
-The first sign-up needs the setup token:
+At the end, install prints the setup token. Open `https://chat.family.example.com`,
+choose "Create account", and sign up with your username and that token. Within a
+minute you're a server admin, and an admin room shows up in Element (under
+"System Alerts"). You'll also be in the Family room with the agent.
+
+If you lose the token, it's on the server:
 
 ```bash
 ssh root@family.example.com cat /var/lib/barnaby-home/registration-token
 ```
-
-Open `https://chat.family.example.com`, choose "Create account", and sign up
-with the username you put in `admins` and that token. Within a minute you're a
-server admin, and an admin room shows up in Element (under "System Alerts").
-You'll also be in the Family room with the agent.
 
 ### 7. Invite your family
 
@@ -154,24 +143,26 @@ The setup token keeps working, so keep it to yourself.
 
 ## Updating
 
-```bash
-nix flake update
-nix run nixpkgs#nixos-rebuild -- switch --flake .#home --target-host root@family.example.com
-```
-
-The same `nixos-rebuild` command applies any change to `configuration.nix`. It
-builds on your computer, so on a Mac (which can't build Linux systems) add
-`--build-host root@family.example.com` to build on the VPS instead.
-
-To change a key, edit `/var/lib/barnaby-home/secrets.env` on the server, then
-restart the agent:
+After changing `configuration.nix`, `soul.md`, or `secrets.env`:
 
 ```bash
-ssh root@family.example.com systemctl restart container@barnaby
+./barnaby-home deploy
 ```
 
-If a key that a skill needs is missing, `journalctl -u barnaby-home-setup` says
-so.
+It builds on your computer, switches the server over, and if `secrets.env`
+changed, copies it up and restarts the agent. That replaces the server's copy,
+so make key changes here, not there. If a key that a skill needs is missing,
+`journalctl -u barnaby-home-setup` on the server says so.
+
+To update Barnaby Home, Barnaby, and NixOS, then deploy:
+
+```bash
+./barnaby-home update
+```
+
+Docker keeps the Nix store in a volume, so these don't download everything
+again. It only grows; `docker volume rm barnaby-home-nix` gets the space back,
+and the next run starts over.
 
 ## Configuration
 
@@ -266,3 +257,45 @@ fails instead of quietly going somewhere else.
   hands that to a person yet.
 - **Phone apps haven't been tested yet.** Element in the browser works,
   including calls.
+
+## Installing without the script
+
+If you already have Nix, with flakes, you can skip Docker. The script runs these
+same commands.
+
+```bash
+mkdir family && cd family
+nix flake init -t github:pkulak/barnaby-home
+git init && git add .
+cp secrets.env.example secrets.env && chmod 600 secrets.env
+```
+
+Edit `configuration.nix` (at least the domain, disk, admin, time zone, and SSH
+key) and `secrets.env`. Then put `secrets.env` where the server expects it, and
+install:
+
+```bash
+mkdir -p extra/var/lib/barnaby-home
+chmod 755 extra extra/var extra/var/lib
+chmod 700 extra/var/lib/barnaby-home
+cp secrets.env extra/var/lib/barnaby-home/
+
+nix run github:nix-community/nixos-anywhere -- \
+  --flake .#home \
+  --generate-hardware-config nixos-facter ./facter.json \
+  --extra-files ./extra \
+  --target-host root@203.0.113.10
+
+rm -r extra
+git add facter.json
+```
+
+To deploy changes (add `--build-host root@family.example.com` on a Mac):
+
+```bash
+nix run nixpkgs#nixos-rebuild -- switch --flake .#home --target-host root@family.example.com
+```
+
+Keys live on the server after that, in `/var/lib/barnaby-home/secrets.env`;
+restart the agent with `systemctl restart container@barnaby` after changing
+them.
