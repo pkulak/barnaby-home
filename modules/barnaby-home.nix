@@ -186,6 +186,29 @@ in
         transcribe = true;
         sports-scores = true;
         sports-monitor = true;
+        skill-writer = ../skills/skill-writer;
+      };
+
+      # The agent can `nix shell` tools its own skills need. Those aren't GC
+      # roots, so they go after a while.
+      nix.gc = {
+        automatic = true;
+        dates = "weekly";
+        options = "--delete-older-than 30d";
+      };
+
+      containers.barnaby.config.nix = {
+        settings.experimental-features = [
+          "nix-command"
+          "flakes"
+        ];
+        # The system's own nixpkgs, so `nix shell nixpkgs#...` needs no
+        # download and matches what's installed.
+        settings.flake-registry = "";
+        registry.nixpkgs.to = {
+          type = "path";
+          path = pkgs.path;
+        };
       };
 
       systemd.services.barnaby-home-secrets = {
@@ -405,10 +428,81 @@ in
           agent.skills
           // lib.optionalAttrs ((agent.skills.sports-scores or false) == false) { sports-monitor = false; };
 
+        # The tools models expect to find, so they don't have to `nix shell`
+        # them every time.
         extraPackages = with pkgs; [
           curl
+          xh
+          wget
+          fd
+          ripgrep
+          git
+          git-lfs
+          file
+          tree
+          which
+          less
+          procps
           jq
-          python3
+          yq
+          gawk
+          xan
+          gron
+          xmlstarlet
+          libxml2
+          htmlq
+          sd
+
+          zip
+          unzip
+          p7zip
+          zstd
+          xz
+          gzip
+          bzip2
+          gnutar
+
+          imagemagick
+          ffmpeg-headless
+          poppler-utils
+          pandoc
+          typst
+          qpdf
+          ghostscript
+          exiftool
+          mediainfo
+          tesseract
+          ocrmypdf
+
+          sqlite
+          duckdb
+          w3m
+          shellcheck
+          shfmt
+          nodejs
+          pnpm
+          yt-dlp
+
+          dnsutils
+          iputils
+          iproute2
+          netcat
+          socat
+          openssl
+          openssh
+
+          (python3.withPackages (
+            ps: with ps; [
+              caldav
+              requests
+              lxml
+              pyyaml
+              pillow
+              python-dateutil
+              pandas
+              pypdf
+            ]
+          ))
         ];
       };
     }

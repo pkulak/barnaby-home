@@ -75,6 +75,12 @@ pkgs.testers.runNixOSTest {
         machine.succeed("systemctl -M barnaby is-enabled barnaby-memory.timer")
         machine.succeed("grep -q 'Mr. Wiggles' $(systemctl -M barnaby show barnaby -p Environment --value | tr ' ' '\\n' | sed -n 's/^BARNABY_SOUL_FILE=//p')")
 
+    with subtest("agent can write skills"):
+        machine.succeed("test -f /var/lib/barnaby/skills/skill-writer/SKILL.md")
+        as_agent = "nixos-container run barnaby -- su -s /bin/sh barnaby -c"
+        machine.succeed(f"{as_agent} 'git --version && rg --version'")
+        machine.succeed(f"{as_agent} 'nix eval --raw nixpkgs#hello.pname' | grep -q hello")
+
     with subtest("new users join the family room, and admins are promoted"):
         alice = register("alice")
         assert family in joined_rooms(alice)

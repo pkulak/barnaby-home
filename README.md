@@ -204,11 +204,29 @@ The agent also uses the system's `time.timeZone`.
 | `weather` | Forecasts and conditions | `TOMORROWIO_API_KEY` | Off |
 | `web-search` | Searches the web with Kagi | `KAGI_KEY` | Off |
 | `calendar` | Reads and edits a CalDAV calendar | `CALDAV_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD` | Off |
+| `skill-writer` | Lets the agent write its own skills | Nothing more | On |
 
 Turn one on with `agent.skills.weather = true;`, or off with `false`. Turning
 off `sports-scores` turns off `sports-monitor` too. A path to a
 directory with a `SKILL.md` adds your own; see Barnaby's
 [skills docs](https://github.com/pkulak/barnaby/blob/master/docs/skills.md).
+
+### The agent's own skills
+
+With `skill-writer` on, anyone can ask the agent to learn something new ("every
+Sunday, check what's due this week"), and it writes itself a skill. It can't
+change the bundled skills, its soul, or anything else in your config.
+
+- Its skills live in `/var/lib/barnaby/.agents/skills`, a git repo, and it
+  commits every change. To see what it's done, or undo something, SSH in and
+  use `git log` and `git revert` there.
+- Whenever it adds, changes, or removes a skill, it says so in the Family room,
+  even if someone asked in a DM.
+- If a skill needs an API key, it asks for it in a DM, saves it to
+  `/var/lib/barnaby/.agents/secrets.env`, and suggests deleting the message.
+- It has the usual command-line tools (git, ripgrep, jq, ffmpeg, ImageMagick,
+  pandoc, Python, Node, and more), and can `nix shell` anything else. Weekly
+  garbage collection cleans those up again.
 
 ## Privacy
 
@@ -228,6 +246,13 @@ agent, of course, has to send what it reads to a model. Here's where it goes:
   OpenRouter, both ZDR.
 - **Weather, search, and calendar:** Tomorrow.io, Kagi, and your CalDAV server,
   but only if you turn them on.
+- **The agent's own skills:** whatever services they use.
+
+The agent has one conversation across every room and DM, so it knows what was
+said in DMs when it's talking in the Family room. It's told not to repeat
+private things from DMs, but that's an instruction, not a wall. The same goes
+for API keys: one sent in a DM is still in the agent's context, and in its
+session files on the VPS, even after the message is deleted.
 
 Nothing in Barnaby Home forces OpenRouter to use ZDR endpoints yet. OpenRouter's
 account setting does: with it on, a request to a model without a ZDR endpoint
@@ -235,7 +260,8 @@ fails instead of quietly going somewhere else.
 
 ## Limitations
 
-- **No backups yet.** Everything lives in `/var/lib`, and losing the VPS loses it.
+- **No backups yet.** Everything lives in `/var/lib`, including the agent's
+  own skills and keys, and losing the VPS loses it.
 - **The agent created the Family room, so it's the room's admin.** Nothing
   hands that to a person yet.
 - **Phone apps haven't been tested yet.** Element in the browser works,
