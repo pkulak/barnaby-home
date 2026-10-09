@@ -203,11 +203,13 @@ in
           "flakes"
         ];
         # The system's own nixpkgs, so `nix shell nixpkgs#...` needs no
-        # download and matches what's installed.
+        # download and matches what's installed. `pkgs.path` would be copied
+        # into a new store path, which Nix then hashes on every call (a
+        # minute, on a small VPS).
         settings.flake-registry = "";
         registry.nixpkgs.to = {
           type = "path";
-          path = pkgs.path;
+          path = if config.nixpkgs.flake.source != null then config.nixpkgs.flake.source else pkgs.path;
         };
       };
 
