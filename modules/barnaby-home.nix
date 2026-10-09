@@ -39,15 +39,20 @@ let
   );
 
   barnabySoul = builtins.readFile "${barnaby}/SOUL.md";
-  soul =
+  soul = pkgs.writeText "soul.md" (
     if agent.soul != null then
-      agent.soul
+      builtins.replaceStrings [ "@name@" ] [ agent.name ] (builtins.readFile agent.soul)
     else
-      pkgs.writeText "soul.md" (
-        builtins.replaceStrings [ "**Name:** Barnaby" ] [ "**Name:** ${agent.name}" ] barnabySoul
-      );
+      builtins.replaceStrings [ "**Name:** Barnaby" ] [ "**Name:** ${agent.name}" ] barnabySoul
+  );
 
   adminCommands = map (user: "users make-user-admin @${user}:${domain}") cfg.admins;
+
+  # Asks Jev whether each group message is meant for the agent. The rest are
+  # still recorded in its session, but don't start a turn.
+  groupTrigger = pkgs.writeShellScript "group-trigger" ''
+    exec ${pkgs.python3}/bin/python3 ${barnaby}/examples/group_trigger.py
+  '';
 
   # Matrix lowercases usernames, and these are the characters it allows.
   localpart = lib.types.strMatching "[a-z0-9._=-]+";
@@ -140,14 +145,14 @@ in
         type = lib.types.nullOr lib.types.path;
         default = null;
         description = ''
-          The agent's system prompt. The default is Barnaby's own, with `name`
-          filled in.
+          The agent's system prompt, where `@name@` becomes `name`. The
+          default is Barnaby's own, with `name` filled in.
         '';
       };
 
       model = lib.mkOption {
         type = lib.types.str;
-        default = "anthropic/claude-sonnet-5.5";
+        default = "deepseek/deepseek-v4.1-flash";
         description = "The OpenRouter model the agent chats with.";
       };
 
@@ -377,6 +382,8 @@ in
           BARNABY_PI_PROVIDER = "openrouter";
           BARNABY_PI_MODEL = agent.model;
           BARNABY_SOUL_FILE = "${soul}";
+          BARNABY_GROUP_TRIGGER_SCRIPT = "${groupTrigger}";
+          BARNABY_AGENT_NAME = agent.name;
           TZ = if config.time.timeZone != null then config.time.timeZone else "UTC";
         }
         // lib.optionalAttrs (cfg.location != null) { WEATHER_HOME = cfg.location; };

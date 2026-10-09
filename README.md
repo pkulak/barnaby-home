@@ -27,7 +27,9 @@ or train on your messages.
 - **A VPS** with at least 2 GB of RAM (nixos-anywhere needs 1.5 GB just to
   install) and 20 GB of disk, running any Linux you can SSH into as root or as a
   user with sudo. The install erases it. So far it's only been tested on an AWS
-  EC2 t3.small.
+  EC2 t3.small. Everything runs in about 450 MB, so you can probably shrink it
+  to 1 GB after the install, as long as you build updates on your own computer
+  (see [Updating](#updating)).
 - **A domain**, or a subdomain of one you already have.
 - **Nix** on your own computer, with flakes enabled.
 - **An OpenRouter API key.** Turn on "Zero Data Retention" in OpenRouter's privacy
@@ -75,13 +77,20 @@ git init && git add .
 
 Then edit `configuration.nix`. At a minimum, set the domain, your SSH public
 key, the time zone, your username in `admins`, and the disk. To find the disk,
-SSH in and run `lsblk`; it's usually `/dev/sda`, `/dev/vda`, or `/dev/nvme0n1`.
+SSH in and run `lsblk -dp`; it's usually `/dev/sda`, `/dev/vda`, or
+`/dev/nvme0n1`.
+
+The agent works fine without knowing anything about your family, but it's much
+better when it does. Edit `soul.md` (who's who, where you live, which teams you
+follow) and uncomment `soul = ./soul.md;`. You can do this later, too; it takes
+effect on the next deploy.
 
 ### 4. Add your keys
 
 ```bash
 cp secrets.env.example secrets.env
 chmod 600 secrets.env
+nano secrets.env
 ```
 
 Fill in `OPENROUTER_API_KEY`, plus the keys for any extra skills you turned on.
@@ -178,8 +187,8 @@ Everything is under `barnabyHome` in `configuration.nix`:
 | `calls.enable` | `true` | Voice and video calls |
 | `agent.name` | `"Barnaby"` | The agent's display name |
 | `agent.username` | `name`, lowercased | Its Matrix username. It's set on first boot, so changing it later does nothing. |
-| `agent.soul` | Barnaby's, with `name` filled in | A file with the agent's personality and instructions |
-| `agent.model` | `anthropic/claude-sonnet-5.5` | The OpenRouter model it chats with |
+| `agent.soul` | Barnaby's, with `name` filled in | A file with the agent's personality and instructions, where `@name@` becomes `name` |
+| `agent.model` | `deepseek/deepseek-v4.1-flash` | The OpenRouter model it chats with |
 | `agent.skills` | See below | Skills to turn on or off |
 
 The agent also uses the system's `time.timeZone`.
@@ -206,8 +215,12 @@ directory with a `SKILL.md` adds your own; see Barnaby's
 The chat server is yours: messages, accounts, and files stay on the VPS. The
 agent, of course, has to send what it reads to a model. Here's where it goes:
 
-- **Chat:** `agent.model`, through OpenRouter. The default has ZDR endpoints on
-  Amazon Bedrock and Google.
+- **Chat:** `agent.model`, through OpenRouter. The default, DeepSeek V4.1 Flash,
+  is an open model with ZDR endpoints at over 20 providers.
+- **Every Family room message:** [Jev](https://openrouter.ai/typesafe/jev-1.13),
+  a tiny ZDR model that decides whether it's meant for the agent. The agent
+  still gets every message as context, but only the ones meant for it start a
+  turn (and a call to `agent.model`).
 - **Images and voice messages:** Microsoft's MAI models on Azure, through
   OpenRouter, both ZDR.
 - **Weather, search, and calendar:** Tomorrow.io, Kagi, and your CalDAV server,
@@ -220,9 +233,6 @@ fails instead of quietly going somewhere else.
 ## Limitations
 
 - **No backups yet.** Everything lives in `/var/lib`, and losing the VPS loses it.
-- **The agent reads everything in the Family room**, and every message is a
-  model call, even the ones it decides not to answer. A chatty family will see
-  that on the OpenRouter bill.
 - **The agent created the Family room, so it's the room's admin.** Nothing
   hands that to a person yet.
 - **Phone apps haven't been tested yet.** Element in the browser works,

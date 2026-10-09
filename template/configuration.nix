@@ -2,7 +2,7 @@
   barnabyHome = {
     domain = "family.example.com";
 
-    # The VPS's disk (`lsblk` lists them). The install erases it.
+    # The VPS's disk (`lsblk -dp` lists them). The install erases it.
     disk = "/dev/sda";
 
     # Usernames that become server admins when they sign up.
@@ -13,6 +13,10 @@
 
     agent = {
       name = "Barnaby";
+
+      # The agent's personality and what it knows about the family. Without
+      # this, it uses Barnaby's generic one with the name above.
+      # soul = ./soul.md;
 
       # Bundled skills beyond the defaults. Each needs keys in secrets.env.
       # skills.weather = true;
