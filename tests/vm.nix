@@ -72,6 +72,7 @@ pkgs.testers.runNixOSTest {
     with subtest("agent starts with its soul"):
         machine.wait_for_unit("container@barnaby.service")
         machine.wait_until_succeeds("journalctl -M barnaby -u barnaby | grep -q 'starting matrix sync'", timeout=120)
+        machine.succeed("systemctl -M barnaby is-enabled barnaby-memory.timer")
         machine.succeed("grep -q 'Mr. Wiggles' $(systemctl -M barnaby show barnaby -p Environment --value | tr ' ' '\\n' | sed -n 's/^BARNABY_SOUL_FILE=//p')")
 
     with subtest("new users join the family room, and admins are promoted"):

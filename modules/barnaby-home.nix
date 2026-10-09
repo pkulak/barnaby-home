@@ -384,6 +384,10 @@ in
           BARNABY_SOUL_FILE = "${soul}";
           BARNABY_GROUP_TRIGGER_SCRIPT = "${groupTrigger}";
           BARNABY_AGENT_NAME = agent.name;
+          # Compacting idle sessions keeps them small, and eventually starts
+          # fresh ones, which lets the old ones go quiet and become memory notes.
+          BARNABY_PI_IDLE_TIMEOUT = "6h";
+          BARNABY_PI_COMPACT_ON_IDLE = "true";
           TZ = if config.time.timeZone != null then config.time.timeZone else "UTC";
         }
         // lib.optionalAttrs (cfg.location != null) { WEATHER_HOME = cfg.location; };
@@ -395,6 +399,7 @@ in
         ];
 
         extensions.reminders = true;
+        memory.enable = true;
         # sports-monitor needs sports-scores, so it goes when that does.
         skills =
           agent.skills

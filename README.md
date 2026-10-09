@@ -221,6 +221,9 @@ agent, of course, has to send what it reads to a model. Here's where it goes:
   a tiny ZDR model that decides whether it's meant for the agent. The agent
   still gets every message as context, but only the ones meant for it start a
   turn (and a call to `agent.model`).
+- **Memory:** every night, `agent.model` also reads conversations that have
+  been quiet for 3 days and writes them up as notes, which the agent can search
+  later. The notes stay on the VPS, in `/var/lib/barnaby/memory`.
 - **Images and voice messages:** Microsoft's MAI models on Azure, through
   OpenRouter, both ZDR.
 - **Weather, search, and calendar:** Tomorrow.io, Kagi, and your CalDAV server,
