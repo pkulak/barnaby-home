@@ -38,6 +38,10 @@ or train on your messages.
   settings too; it's the only thing that stops a request from going to a
   provider that keeps it (see [Privacy](#privacy)).
 
+## What it looks like after a fresh install
+
+![Barnaby Screenshot](screenshot.png "Barnaby")
+
 ## Installing
 
 ### 1. Point DNS at the VPS
