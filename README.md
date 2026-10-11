@@ -1,30 +1,39 @@
 # Barnaby Home
 
-Barnaby Home turns a spare computer at home, or a VPS, into a private chat
-server for a family or any other small group, with a
-[Barnaby](https://github.com/pkulak/barnaby) agent that's built for group chat:
-it reads along with everyone and answers when someone's talking to it. A script
-asks for a domain, an SSH key, and an OpenRouter key, then installs the rest.
-All it needs on your computer is Docker.
+A private group chat for your family or friends, with an AI agent that fits
+into it. One script turns a spare computer or a VPS into a complete Matrix
+server: Element chat, encrypted rooms, voice and video calls. A
+[Barnaby](https://github.com/pkulak/barnaby) agent lives in the main room.
+
+**The agent.** Most chat bots want to be @-mentioned or talked to one-on-one.
+Barnaby reads the whole room, and a tiny decision model picks out the messages
+meant for it, so people talk normally and it chimes in when someone's talking
+to it. It remembers past conversations, and with just the OpenRouter key it
+can draw images, read voice messages, follow games, and write itself new
+skills when someone asks. Add two more keys and you get web search and weather.
+
+**The chat server.** Self-hosting Matrix usually means wiring up a homeserver,
+a web client, certificates for several subdomains, TURN and LiveKit for calls,
+and some way to handle invites. Barnaby Home does all of it from a domain, an
+SSH key, and an OpenRouter key. You need Docker on your computer, not Nix
+experience.
+
+## What it looks like after a fresh install
+
+![Barnaby Screenshot](screenshot.png "Barnaby")
 
 What you get:
 
-- **An agent that knows when to talk.** A tiny model reads each message and
-  decides whether it's meant for the agent, so you can talk to it like a
-  person, and only those messages start a turn with the main model. It still
-  reads everything, so when someone asks, it knows what you've been talking
-  about.
-- **A complete Matrix server:** [Element](https://element.io) in the browser
-  at `chat.<domain>`, the [tuwunel](https://github.com/matrix-construct/tuwunel)
-  server behind it, voice and video calls through [LiveKit](https://livekit.io),
-  and TLS certificates.
-- **Invite-only:** sign-up needs a token, and everyone lands in an encrypted
+- **The stack:** [tuwunel](https://github.com/matrix-construct/tuwunel) as the
+  server, [Element](https://element.io) at `chat.<domain>`,
+  [LiveKit](https://livekit.io) for calls, and Let's Encrypt certificates.
+- **Invite-only:** sign-up takes a token. Everyone lands in an encrypted
   General room with the agent, which other Matrix servers can't join.
-- **Ready to go,** sandboxed in a NixOS container. It remembers past
-  conversations and comes with skills for search, weather, images, voice
-  messages, sports, and calendars.
-- **Skills it writes itself** when someone asks, kept in git so you can see and
-  undo them.
+- **A sandboxed agent:** it runs in its own NixOS container, not on the host.
+- **More skills when you want them:** web search, weather, and calendars, each
+  turned on with its own API key.
+- **Self-written skills you can audit:** they're kept in git, so you can see
+  and undo them.
 - **Private defaults:** every model it uses has zero data retention (ZDR)
   endpoints.
 - **One command to deploy or update,** with everything built on your computer.
@@ -51,10 +60,6 @@ What you get:
 - **An OpenRouter API key.** Turn on "Zero Data Retention" in OpenRouter's
   privacy settings too; it's the only thing that stops a request from going to
   a provider that keeps it (see [Privacy](#privacy)).
-
-## What it looks like after a fresh install
-
-![Barnaby Screenshot](screenshot.png "Barnaby")
 
 ## Installing
 
@@ -205,6 +210,9 @@ Everything is under `barnabyHome` in `configuration.nix`:
 | `agent.soul` | Barnaby's, with `name` filled in | A file with the agent's personality and instructions, where `@name@` becomes `name` |
 | `agent.model` | `deepseek/deepseek-v4.1-flash` | The OpenRouter model it chats with |
 | `agent.skills` | See below | Skills to turn on or off |
+
+It's a Nix file, but all you need is what's shown here: `true` or `false`, text
+in quotes, lists in `[ ]`, and a `;` after each setting.
 
 The agent also uses the system's `time.timeZone`.
 
