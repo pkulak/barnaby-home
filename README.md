@@ -10,7 +10,7 @@ Barnaby reads the whole room, and a tiny decision model picks out the messages
 meant for it, so people talk normally and it chimes in when someone's talking
 to it. It remembers past conversations, and with just the OpenRouter key it
 can draw images, read voice messages, follow games, and write itself new
-skills when someone asks. Add two more keys and you get web search and weather.
+skills when someone asks.
 
 **The chat server.** Self-hosting Matrix usually means wiring up a homeserver,
 a web client, certificates for several subdomains, TURN and LiveKit for calls,
@@ -22,7 +22,7 @@ experience.
 
 ![Barnaby Screenshot](screenshot.png "Barnaby")
 
-What you get:
+## What you get
 
 - **The stack:** [tuwunel](https://github.com/matrix-construct/tuwunel) as the
   server, [Element](https://element.io) at `chat.<domain>`,
