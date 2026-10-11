@@ -55,13 +55,13 @@ pkgs.testers.runNixOSTest {
     def joined_rooms(token):
         return call("GET", "joined_rooms", token=token)["joined_rooms"]
 
-    with subtest("agent account and family room"):
+    with subtest("agent account and general room"):
         machine.wait_for_unit("barnaby-home-setup.service")
         machine.succeed("grep -qx 'BARNABY_MATRIX_USER_ID=@mr.wiggles:barntest.test' /var/lib/barnaby-home/agent.env")
         profile = call("GET", "profile/%40mr.wiggles%3Abarntest.test")
         assert profile["displayname"] == "Mr. Wiggles", profile
-        family = machine.succeed("sed -n 's/^BARNABY_MATRIX_ROOM_ID=//p' /var/lib/barnaby-home/room.env").strip()
-        assert call("GET", "directory/room/%23family%3Abarntest.test")["room_id"] == family
+        general = machine.succeed("sed -n 's/^BARNABY_MATRIX_ROOM_ID=//p' /var/lib/barnaby-home/room.env").strip()
+        assert call("GET", "directory/room/%23general%3Abarntest.test")["room_id"] == general
 
     with subtest("missing keys are reported"):
         setup_log = machine.succeed("journalctl -u barnaby-home-setup")
@@ -81,11 +81,11 @@ pkgs.testers.runNixOSTest {
         machine.succeed(f"{as_agent} 'git --version && rg --version'")
         machine.succeed(f"{as_agent} 'nix eval --raw nixpkgs#hello.pname' | grep -q hello")
 
-    with subtest("new users join the family room, and admins are promoted"):
+    with subtest("new users join the general room, and admins are promoted"):
         alice = register("alice")
-        assert family in joined_rooms(alice)
+        assert general in joined_rooms(alice)
         bob = register("bob")
-        assert family in joined_rooms(bob)
+        assert general in joined_rooms(bob)
 
         admin_room = call("GET", "directory/room/%23admins%3Abarntest.test")["room_id"]
         machine.succeed("systemctl start barnaby-home-admins.service")

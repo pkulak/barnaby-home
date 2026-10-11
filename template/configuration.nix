@@ -1,12 +1,12 @@
 {
   barnabyHome = {
-    domain = "family.example.com";
+    domain = "barn.example.com";
 
-    # The VPS's disk (`lsblk -dp` lists them). The install erases it.
+    # The machine's disk (`lsblk -dp` lists them). The install erases it.
     disk = "/dev/sda";
 
     # Usernames that become server admins when they sign up.
-    admins = [ "dad" ];
+    admins = [ "dave" ];
 
     # The weather skill's default location, as "latitude,longitude".
     # location = "41.88,-87.63";
@@ -14,7 +14,7 @@
     agent = {
       name = "Barnaby";
 
-      # The agent's personality and what it knows about the family. Without
+      # The agent's personality and what it knows about everyone. Without
       # this, it uses Barnaby's generic one with the name above.
       # soul = ./soul.md;
 

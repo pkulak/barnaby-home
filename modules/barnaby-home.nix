@@ -17,7 +17,7 @@ let
 
   tuwunelUrl = "http://127.0.0.1:6167";
   callDomain = "call.${domain}";
-  familyRoomAlias = "#family:${domain}";
+  generalRoomAlias = "#general:${domain}";
 
   # The keys each bundled skill needs from the secrets file.
   skillKeys = {
@@ -79,7 +79,7 @@ in
   options.barnabyHome = {
     domain = lib.mkOption {
       type = lib.types.str;
-      example = "family.example.com";
+      example = "barn.example.com";
       description = ''
         The Matrix server name. Element is served at `chat.<domain>` and calls
         at `call.<domain>`, so DNS needs records for the domain and those
@@ -247,7 +247,7 @@ in
           registration_token_file = "/run/credentials/tuwunel.service/registration-token";
           oidc_native_auth = true;
           oidc_registration_allowed_redirect_hosts = [ "chat.${domain}" ];
-          auto_join_rooms = [ familyRoomAlias ];
+          auto_join_rooms = [ generalRoomAlias ];
 
           # The agent registers first, and it shouldn't be the admin. Admins
           # are promoted by these commands instead, at startup and on SIGUSR2.
@@ -302,10 +302,10 @@ in
         443
       ];
 
-      # Creates the agent's account and the family room once, and keeps the
+      # Creates the agent's account and the General room once, and keeps the
       # agent's display name in sync with the config.
       systemd.services.barnaby-home-setup = {
-        description = "Set up the Barnaby account and family room";
+        description = "Set up the Barnaby account and General room";
         requires = [ "tuwunel.service" ];
         after = [ "tuwunel.service" ];
         requiredBy = [ "container@barnaby.service" ];
@@ -372,8 +372,8 @@ in
           # only people with an account here can join.
           if [ ! -s room.env ]; then
             response=$(call POST createRoom <<< '{
-              "name": "Family",
-              "room_alias_name": "family",
+              "name": "General",
+              "room_alias_name": "general",
               "preset": "public_chat",
               "creation_content": {"m.federate": false},
               "initial_state": [{
@@ -385,7 +385,7 @@ in
             room_id=$(jq -r .room_id <<< "$response")
 
             if [ "$room_id" = null ]; then
-              echo "Creating the family room failed: $response" >&2
+              echo "Creating the General room failed: $response" >&2
               exit 1
             fi
 

@@ -2,8 +2,8 @@
 # Sets up, configures, installs, and deploys Barnaby Home. It runs everything
 # in Docker, so Docker is all you need:
 #
-#   bash barnaby-home setup family
-#   cd family
+#   bash barnaby-home setup barn
+#   cd barn
 #   ./barnaby-home configure
 #   ./barnaby-home install
 #   ./barnaby-home deploy     # after changing anything

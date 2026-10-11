@@ -1,4 +1,4 @@
-# A single-disk VPS installed with nixos-anywhere. Hardware detection comes
+# A single-disk machine installed with nixos-anywhere. Hardware detection comes
 # from nixos-facter (`hardware.facter.reportPath`), so nothing here is
 # specific to a provider.
 { disko }:

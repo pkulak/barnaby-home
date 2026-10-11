@@ -1,42 +1,51 @@
 # Barnaby Home
 
-Barnaby Home turns a fresh VPS into a private chat server for a family, with a
-[Barnaby](https://github.com/pkulak/barnaby) agent living in the family room.
-A script asks you for a domain, an SSH key, and an OpenRouter key, then
-installs the rest. All it needs on your computer is Docker.
+Barnaby Home turns a spare computer at home, or a VPS, into a private chat
+server with a [Barnaby](https://github.com/pkulak/barnaby) agent in it, for a
+family or any other small group. A script asks for a domain, an SSH key, and an
+OpenRouter key, then installs the rest. All it needs on your computer is
+Docker.
 
 What you get:
 
-| Address | What's there |
-|---|---|
-| `https://chat.<domain>` | [Element](https://element.io), the chat app, in the browser |
-| `<domain>` | The Matrix server, [tuwunel](https://github.com/matrix-construct/tuwunel), including its sign-up and sign-in pages |
-| `call.<domain>` | Voice and video calls, through [LiveKit](https://livekit.io) |
-
-Everyone who signs up lands in an encrypted Family room with the agent. The room
-is closed to other Matrix servers, and sign-up needs a token, so nobody gets in
-without an invite.
-
-The agent talks to models through [OpenRouter](https://openrouter.ai), and the
-defaults all have zero data retention (ZDR) endpoints: providers that don't store
-or train on your messages.
+- **A complete Matrix server:** [Element](https://element.io) in the browser
+  at `chat.<domain>`, the [tuwunel](https://github.com/matrix-construct/tuwunel)
+  server behind it, voice and video calls through [LiveKit](https://livekit.io),
+  and TLS certificates.
+- **Invite-only:** sign-up needs a token, and everyone lands in an encrypted
+  General room with the agent, which other Matrix servers can't join.
+- **An agent that's ready to go,** sandboxed in a NixOS container. It reads
+  along and only answers what's meant for it, remembers past conversations,
+  and comes with skills for search, weather, images, voice messages, sports,
+  and calendars.
+- **Skills it writes itself** when someone asks, kept in git so you can see and
+  undo them.
+- **Private defaults:** every model it uses has zero data retention (ZDR)
+  endpoints.
+- **One command to deploy or update,** with everything built on your computer.
 
 ## Requirements
 
-- **A VPS** with at least 2 GB of RAM (nixos-anywhere needs 1.5 GB just to
-  install) and 20 GB of disk, running any x86_64 Linux you can SSH into as root
-  or as a user with sudo. The install erases it. So far it's only been tested on
-  an AWS EC2 t3.small. Everything runs in about 450 MB, and builds happen on
-  your computer, so you can probably shrink it to 1 GB after the install.
+- **An x86_64 machine** with at least 2 GB of RAM (nixos-anywhere needs 1.5 GB
+  just to install) and 20 GB of disk. A spare PC or mini PC at home works, and
+  so does a VPS. It needs to be running Linux, any kind, and you need to be able
+  to SSH into it as root or as a user with sudo. At home, booting it from the
+  NixOS installer on a USB stick does that. The install erases the disk. So far
+  it's only been tested on an AWS EC2 t3.small. Everything runs in about
+  450 MB, and builds happen on your computer, so on a VPS you can probably
+  shrink it to 1 GB after the install.
+- **A public IP address.** A VPS has one. At home, your internet connection
+  needs its own IPv4 address (not one shared through CGNAT), and your router
+  needs to forward [these ports](#2-open-the-ports) to the machine.
 - **A domain**, or a subdomain of one you already have.
 - **[Docker](https://docs.docker.com/get-docker/)** on your own computer, and
   10 GB or so of disk for it. On a Mac with Apple Silicon, it runs the x86_64
   container through Rosetta (Docker Desktop's "Use Rosetta" setting), which
   is slower.
 - **An SSH key.** If you don't have one, `ssh-keygen -t ed25519` makes one.
-- **An OpenRouter API key.** Turn on "Zero Data Retention" in OpenRouter's privacy
-  settings too; it's the only thing that stops a request from going to a
-  provider that keeps it (see [Privacy](#privacy)).
+- **An OpenRouter API key.** Turn on "Zero Data Retention" in OpenRouter's
+  privacy settings too; it's the only thing that stops a request from going to
+  a provider that keeps it (see [Privacy](#privacy)).
 
 ## What it looks like after a fresh install
 
@@ -44,23 +53,26 @@ or train on your messages.
 
 ## Installing
 
-### 1. Point DNS at the VPS
+### 1. Point DNS at the machine
 
-Add two `A` records (and `AAAA`, if the VPS has IPv6), both pointing at the VPS:
+Add two `A` records (and `AAAA`, if the machine has IPv6), both pointing at its
+public IP:
 
 ```
-family.example.com      A  203.0.113.10
-*.family.example.com    A  203.0.113.10
+barn.example.com      A  203.0.113.10
+*.barn.example.com    A  203.0.113.10
 ```
 
 The wildcard covers `chat.` and `call.`. Let's Encrypt checks these names during
-the install, so set them up first, and give the VPS a static IP (an Elastic IP,
-on AWS) so they stay right.
+the install, so set them up first. The IP has to stay the same, too: on AWS,
+use an Elastic IP. At home, get a static IP from your ISP, or keep the records
+up to date with your DNS provider's dynamic DNS.
 
 ### 2. Open the ports
 
-NixOS runs its own firewall, but most providers also have one in front of the
-VPS (a security group, on AWS). Open these there:
+NixOS runs its own firewall, but there's usually another one in front of the
+machine: a security group on AWS, or your router at home. Open these there, and
+at home, forward them to the machine:
 
 | Port | Protocol | For |
 |---|---|---|
@@ -77,11 +89,11 @@ Leave out everything but 22, 80, and 443 if you set `calls.enable = false`.
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/pkulak/barnaby-home/main/template/barnaby-home
-bash barnaby-home setup family
-cd family
+bash barnaby-home setup barn
+cd barn
 ```
 
-That makes a `family` directory with a git repository, the config, and a copy
+That makes a `barn` directory with a git repository, the config, and a copy
 of the script. Everything after this runs from there. The first run takes a few
 minutes, while Docker downloads Nix and Nix downloads everything else.
 
@@ -92,9 +104,10 @@ minutes, while Docker downloads Nix and Nix downloads everything else.
 ```
 
 It asks for the domain, the SSH key to log in with (`~/.ssh/id_ed25519`, by
-default), how you SSH into the VPS now (`ssh -i ~/keys/aws.pem
-ubuntu@203.0.113.10`, say), your username in the chat, the time zone, the
-agent's name, any extra skills, and the OpenRouter key. It logs in to the VPS to find the disk to install onto.
+default), how you SSH into the machine now (`ssh nixos@192.168.1.50`, or
+`ssh -i ~/keys/aws.pem ubuntu@203.0.113.10` on AWS, say), your username in the
+chat, the time zone, the agent's name, any extra skills, and the OpenRouter
+key. It logs in to the machine to find the disk to install onto.
 
 The answers go into `configuration.nix` and `secrets.env` (which git ignores,
 so the keys never end up in the repository or the Nix store), and you can edit
@@ -102,10 +115,11 @@ both by hand from here on; see [Configuration](#configuration). You can run
 configure again, too, but it starts `configuration.nix` over, so it asks first
 if you've changed anything.
 
-The agent works fine without knowing anything about your family, but it's much
-better when it does. Edit `soul.md` (who's who, where you live, which teams you
-follow) and uncomment `soul = ./soul.md;` in `configuration.nix`. You can do
-this later, too; it takes effect on the next deploy.
+The agent works fine without knowing anything about the people using it, but
+it's much better when it does. Edit `soul.md` (who's who, where you live,
+which teams you follow) and uncomment `soul = ./soul.md;` in
+`configuration.nix`. You can do this later, too; it takes effect on the next
+deploy.
 
 ### 5. Install
 
@@ -113,26 +127,27 @@ this later, too; it takes effect on the next deploy.
 ./barnaby-home install
 ```
 
-This erases the VPS, so it has you type the domain first. Then it runs
-nixos-anywhere, which builds the system on your computer, copies it over, and
-reboots the VPS into NixOS. It writes two files you should commit:
-`facter.json`, which describes the VPS's hardware, and `known_hosts`, its new
-SSH host key.
+This erases the machine's disk, so it has you type the domain first. Then it
+runs nixos-anywhere, which builds the system on your computer, copies it over,
+and reboots the machine into NixOS (take out the USB stick, if you booted from
+one). It writes two files you should commit: `facter.json`, which describes the
+machine's hardware, and `known_hosts`, its new SSH host key.
 
 ### 6. Sign up
 
-At the end, install prints the setup token. Open `https://chat.family.example.com`,
-choose "Create account", and sign up with your username and that token. Within a
-minute you're a server admin, and an admin room shows up in Element (under
-"System Alerts"). You'll also be in the Family room with the agent.
+At the end, install prints the setup token. Open
+`https://chat.barn.example.com`, choose "Create account", and sign up with
+your username and that token. Within a minute you're a server admin, and an
+admin room shows up in Element (under "System Alerts"). You'll also be in the
+General room with the agent.
 
 If you lose the token, it's on the server:
 
 ```bash
-ssh root@family.example.com cat /var/lib/barnaby-home/registration-token
+ssh root@barn.example.com cat /var/lib/barnaby-home/registration-token
 ```
 
-### 7. Invite your family
+### 7. Invite everyone else
 
 Make a one-time invite token by sending this in the admin room:
 
@@ -141,7 +156,7 @@ Make a one-time invite token by sending this in the admin room:
 ```
 
 Send them the token and the `https://chat.<domain>` link. Once they sign up,
-they're in the Family room too.
+they're in the General room too.
 
 The setup token keeps working, so keep it to yourself.
 
@@ -215,7 +230,7 @@ change the bundled skills, its soul, or anything else in your config.
 - Its skills live in `/var/lib/barnaby/.agents/skills`, a git repo, and it
   commits every change. To see what it's done, or undo something, SSH in and
   use `git log` and `git revert` there.
-- Whenever it adds, changes, or removes a skill, it says so in the Family room,
+- Whenever it adds, changes, or removes a skill, it says so in the General room,
   even if someone asked in a DM.
 - If a skill needs an API key, it asks for it in a DM, saves it to
   `/var/lib/barnaby/.agents/secrets.env`, and suggests deleting the message.
@@ -225,18 +240,19 @@ change the bundled skills, its soul, or anything else in your config.
 
 ## Privacy
 
-The chat server is yours: messages, accounts, and files stay on the VPS. The
+The chat server is yours: messages, accounts, and files stay on it. The
 agent, of course, has to send what it reads to a model. Here's where it goes:
 
 - **Chat:** `agent.model`, through OpenRouter. The default, DeepSeek V4.1 Flash,
   is an open model with ZDR endpoints at over 20 providers.
-- **Every Family room message:** [Jev](https://openrouter.ai/typesafe/jev-1.13),
-  a tiny ZDR model that decides whether it's meant for the agent. The agent
-  still gets every message as context, but only the ones meant for it start a
-  turn (and a call to `agent.model`).
+- **Every General room message:**
+  [Jev](https://openrouter.ai/typesafe/jev-1.13), a tiny ZDR model that decides
+  whether it's meant for the agent. The agent still gets every message as
+  context, but only the ones meant for it start a turn (and a call to
+  `agent.model`).
 - **Memory:** every night, `agent.model` also reads conversations that have
   been quiet for 3 days and writes them up as notes, which the agent can search
-  later. The notes stay on the VPS, in `/var/lib/barnaby/memory`.
+  later. The notes stay on the server, in `/var/lib/barnaby/memory`.
 - **Images and voice messages:** Microsoft's MAI models on Azure, through
   OpenRouter, both ZDR.
 - **Weather, search, and calendar:** Tomorrow.io, Kagi, and your CalDAV server,
@@ -244,10 +260,10 @@ agent, of course, has to send what it reads to a model. Here's where it goes:
 - **The agent's own skills:** whatever services they use.
 
 The agent has one conversation across every room and DM, so it knows what was
-said in DMs when it's talking in the Family room. It's told not to repeat
+said in DMs when it's talking in the General room. It's told not to repeat
 private things from DMs, but that's an instruction, not a wall. The same goes
 for API keys: one sent in a DM is still in the agent's context, and in its
-session files on the VPS, even after the message is deleted.
+session files on the server, even after the message is deleted.
 
 Nothing in Barnaby Home forces OpenRouter to use ZDR endpoints yet. OpenRouter's
 account setting does: with it on, a request to a model without a ZDR endpoint
@@ -256,8 +272,8 @@ fails instead of quietly going somewhere else.
 ## Limitations
 
 - **No backups yet.** Everything lives in `/var/lib`, including the agent's
-  own skills and keys, and losing the VPS loses it.
-- **The agent created the Family room, so it's the room's admin.** Nothing
+  own skills and keys, and losing the machine loses it.
+- **The agent created the General room, so it's the room's admin.** Nothing
   hands that to a person yet.
 - **Phone apps haven't been tested yet.** Element in the browser works,
   including calls.
@@ -268,7 +284,7 @@ If you already have Nix, with flakes, you can skip Docker. The script runs these
 same commands.
 
 ```bash
-mkdir family && cd family
+mkdir barn && cd barn
 nix flake init -t github:pkulak/barnaby-home
 git init && git add .
 cp secrets.env.example secrets.env && chmod 600 secrets.env
@@ -294,10 +310,10 @@ rm -r extra
 git add facter.json
 ```
 
-To deploy changes (add `--build-host root@family.example.com` on a Mac):
+To deploy changes (add `--build-host root@barn.example.com` on a Mac):
 
 ```bash
-nix run nixpkgs#nixos-rebuild -- switch --flake .#home --target-host root@family.example.com
+nix run nixpkgs#nixos-rebuild -- switch --flake .#home --target-host root@barn.example.com
 ```
 
 Keys live on the server after that, in `/var/lib/barnaby-home/secrets.env`;

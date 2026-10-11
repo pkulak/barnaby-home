@@ -235,9 +235,9 @@ def substitute(text, old, new):
 def write_config(state, public_key):
     text = (TEMPLATE / "configuration.nix").read_text()
     for old, new in [
-        ('domain = "family.example.com";', f"domain = {nix_string(state['DOMAIN'])};"),
+        ('domain = "barn.example.com";', f"domain = {nix_string(state['DOMAIN'])};"),
         ('disk = "/dev/sda";', f"disk = {nix_string(state['DISK'])};"),
-        ('admins = [ "dad" ];', f"admins = [ {nix_string(state['ADMIN'])} ];"),
+        ('admins = [ "dave" ];', f"admins = [ {nix_string(state['ADMIN'])} ];"),
         ('name = "Barnaby";', f"name = {nix_string(state['AGENT_NAME'])};"),
         ('time.timeZone = "America/Chicago";', f"time.timeZone = {nix_string(state['TIMEZONE'])};"),
         ('"ssh-ed25519 AAAA... you@laptop"', nix_string(public_key)),
@@ -254,7 +254,7 @@ def write_config(state, public_key):
 
 
 def find_disks(state):
-    """Lists the VPS's disks over SSH, or returns the error."""
+    """Lists the machine's disks over SSH, or returns the error."""
     result = subprocess.run(
         ssh_args(state["SSH_USER"], state["SSH_HOST"], state["SSH_PORT"]) + ["lsblk -dpno NAME,SIZE,TYPE"],
         capture_output=True,
@@ -283,9 +283,9 @@ def configure(_args):
 
     state["DOMAIN"] = ask(
         questionary.text(
-            "Domain (the one with DNS pointing at the VPS):",
+            "Domain (the one with DNS pointing at the machine):",
             default=state.get("DOMAIN", ""),
-            validate=lambda d: bool(re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", d.lower())) or "Like family.example.com",
+            validate=lambda d: bool(re.fullmatch(r"[a-z0-9-]+(\.[a-z0-9-]+)+", d.lower())) or "Like barn.example.com",
         )
     ).lower()
 
@@ -304,13 +304,13 @@ def configure(_args):
     if not public_key:
         raise Stop(f"Couldn't load {state['ROOT_KEY']}.")
 
-    # The disk comes from the VPS itself, which also checks that SSH works.
+    # The disk comes from the machine itself, which also checks that SSH works.
     # Once it's installed, neither can change.
     command = ssh_command(state) if "SSH_HOST" in state else f"ssh root@{state['DOMAIN']}"
     while not FACTER.exists():
         command = ask(
             questionary.text(
-                "How do you SSH into the VPS now?",
+                "How do you SSH into the machine now?",
                 default=command,
                 validate=lambda c: _ssh_error(c) or True,
                 instruction="(user@host, plus -i and -p if you need them)",
@@ -331,7 +331,7 @@ def configure(_args):
             )
             break
 
-        print(error or "The VPS doesn't seem to have a disk.", file=sys.stderr)
+        print(error or "The machine doesn't seem to have a disk.", file=sys.stderr)
         choice = ask(questionary.select("Now what?", choices=["Try again", "Type in the disk"]))
         if choice == "Type in the disk":
             state["DISK"] = ask(questionary.text("Disk:", default=state.get("DISK", "/dev/sda")))
@@ -442,7 +442,7 @@ def install(_args):
     state = require_state()
     if FACTER.exists():
         raise Stop(
-            "It's installed already, so use ./barnaby-home deploy. To erase the VPS"
+            "It's installed already, so use ./barnaby-home deploy. To erase the machine"
             " and install again, delete facter.json first."
         )
 
@@ -520,7 +520,7 @@ def deploy(_args):
     start_ssh(state)
     git_add()
 
-    # The installed system listens on the usual port, whatever the VPS used
+    # The installed system listens on the usual port, whatever the machine used
     # before.
     ssh = ssh_args("root", state["SSH_HOST"])
     remote = f"{REMOTE_STATE}/secrets.env"
@@ -569,7 +569,7 @@ def main():
     setup_parser.set_defaults(command=setup)
     for name, command, summary in [
         ("configure", configure, "Answer a few questions to write the config"),
-        ("install", install, "Install onto the VPS, erasing it"),
+        ("install", install, "Install onto the machine, erasing it"),
         ("deploy", deploy, "Apply changes to the config or secrets.env"),
         ("update", update, "Update Barnaby Home and everything else, then deploy"),
     ]:

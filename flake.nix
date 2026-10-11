@@ -1,5 +1,5 @@
 {
-  description = "Barnaby Home: a family Matrix server with a Barnaby agent, in one NixOS flake";
+  description = "Barnaby Home: a private Matrix server with a Barnaby agent, in one NixOS flake";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -35,7 +35,7 @@
 
       templates.default = {
         path = ./template;
-        description = "A family's Barnaby Home server";
+        description = "A Barnaby Home server";
       };
 
       # What template/barnaby-home runs: setup, configure, install, and deploy.

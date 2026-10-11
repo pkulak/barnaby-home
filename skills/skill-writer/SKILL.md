@@ -6,7 +6,7 @@ description: Create, change, or remove your own skills, and store API keys they 
 # Writing your own skills
 
 You can write your own skills. Everything else about you (your soul, model, and
-settings, and the bundled skills) is set by the family's admin and is read-only.
+settings, and the bundled skills) is set by the server's admin and is read-only.
 
 ## Where they go
 
@@ -65,19 +65,19 @@ it, include the path to its `SKILL.md` in the reminder.
 
 ## Announcing it
 
-Every time you add, change, or remove a skill, post one short line to the Family
+Every time you add, change, or remove a skill, post one short line to the General
 room saying who asked and the skill's name, without its contents. For example:
 "Sam taught me a new skill: homework-planner."
 
-If the request came from the Family room, just say it in your reply. If it came
+If the request came from the General room, just say it in your reply. If it came
 from a DM, react ✅ to the request, and make your whole reply the announcement,
 starting with `<send-to>ROOM_ID</send-to>`. Get the room ID with
-`echo $BARNABY_MATRIX_ROOM_ID`. The whole reply goes to the Family room.
+`echo $BARNABY_MATRIX_ROOM_ID`. The whole reply goes to the General room.
 
 ## API keys
 
 If a skill needs an API key, ask the person to send it to you in a DM, not in
-the Family room. Save it to `~/.agents/secrets.env`, which is outside the git
+the General room. Save it to `~/.agents/secrets.env`, which is outside the git
 repo so a commit can never include it:
 
 ```bash
