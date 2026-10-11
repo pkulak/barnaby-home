@@ -1,23 +1,28 @@
 # Barnaby Home
 
 Barnaby Home turns a spare computer at home, or a VPS, into a private chat
-server with a [Barnaby](https://github.com/pkulak/barnaby) agent in it, for a
-family or any other small group. A script asks for a domain, an SSH key, and an
-OpenRouter key, then installs the rest. All it needs on your computer is
-Docker.
+server for a family or any other small group, with a
+[Barnaby](https://github.com/pkulak/barnaby) agent that's built for group chat:
+it reads along with everyone and answers when someone's talking to it. A script
+asks for a domain, an SSH key, and an OpenRouter key, then installs the rest.
+All it needs on your computer is Docker.
 
 What you get:
 
+- **An agent that knows when to talk.** A tiny model reads each message and
+  decides whether it's meant for the agent, so you can talk to it like a
+  person, and only those messages start a turn with the main model. It still
+  reads everything, so when someone asks, it knows what you've been talking
+  about.
 - **A complete Matrix server:** [Element](https://element.io) in the browser
   at `chat.<domain>`, the [tuwunel](https://github.com/matrix-construct/tuwunel)
   server behind it, voice and video calls through [LiveKit](https://livekit.io),
   and TLS certificates.
 - **Invite-only:** sign-up needs a token, and everyone lands in an encrypted
   General room with the agent, which other Matrix servers can't join.
-- **An agent that's ready to go,** sandboxed in a NixOS container. It reads
-  along and only answers what's meant for it, remembers past conversations,
-  and comes with skills for search, weather, images, voice messages, sports,
-  and calendars.
+- **Ready to go,** sandboxed in a NixOS container. It remembers past
+  conversations and comes with skills for search, weather, images, voice
+  messages, sports, and calendars.
 - **Skills it writes itself** when someone asks, kept in git so you can see and
   undo them.
 - **Private defaults:** every model it uses has zero data retention (ZDR)
@@ -245,11 +250,11 @@ agent, of course, has to send what it reads to a model. Here's where it goes:
 
 - **Chat:** `agent.model`, through OpenRouter. The default, DeepSeek V4.1 Flash,
   is an open model with ZDR endpoints at over 20 providers.
-- **Every General room message:**
-  [Jev](https://openrouter.ai/typesafe/jev-1.13), a tiny ZDR model that decides
+- **Every group message:** [Jev](https://openrouter.ai/typesafe/jev-1.13), a
+  tiny ZDR model, gets each one with the room's last 20 messages and decides
   whether it's meant for the agent. The agent still gets every message as
   context, but only the ones meant for it start a turn (and a call to
-  `agent.model`).
+  `agent.model`). DMs skip Jev and always go to the agent.
 - **Memory:** every night, `agent.model` also reads conversations that have
   been quiet for 3 days and writes them up as notes, which the agent can search
   later. The notes stay on the server, in `/var/lib/barnaby/memory`.
